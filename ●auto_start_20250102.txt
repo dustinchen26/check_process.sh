@@ -1,0 +1,521 @@
+==================
+= ●●●●起站步驟
+==================
+root@qa01:[~/kent/ran_control/maple/compal_script]: pwd
+/root/kent/ran_control/maple/compal_script
+root@qa01:[~/kent/ran_control/maple/compal_script]: ls
+check_process.sh  get_duipc_status.sh  get_hiphy_status.sh  ptplog        ran_stop.sh  shutdown_hiphy.sh    stop_controller.sh  weblog
+get_cu_status.sh  get_du_status.sh     measure_time.sh      ran_start.sh  rc.local     start_controller.sh  test.sh
+root@qa01:[~/kent/ran_control/maple/compal_script]: 
+
+
+//anydesk上傳到\home\mys-nodejs\Documents\CSCsim
+scp /home/mys-nodejs/Documents/CSCsim/check_process.sh   root@10.205.102.211:/root/kent/ran_control/maple/compal_script
+scp /home/mys-nodejs/Documents/CSCsim/check_process.sh   root@10.205.102.211:/opt/compal_script
+
+vi /opt/compal_script/check_process.sh
+
+// 【step0】: ●檢查重開機啟動腳本
+vi /etc/rc.local 
+
+// ●找出defunct去把它kill
+ps aux | grep controller
+
+// 【step1】: ●maple重啟，controller是rc.local帶起來，無法跑cu，要先砍掉controller
+ps aux | grep controller
+
+// 【step2】: ●重新執行controller
+cd /home/maple
+/home/maple/controller &
+
+// 【step3】: 到kent路徑下去執行script
+cd /root/kent/ran_control/maple/compal_script
+
+// 【step4】: 先起站
+./ran_start.sh 
+
+// 【step5】: 檢查4個腳本
+./get_cu_status.sh
+./get_hiphy_status.sh
+./get_duipc_status.sh
+./get_du_status.sh
+//起站關站
+./ran_start.sh
+./ran_stop.sh
+
+● 一次檢查四個
+./get_cu_status.sh && ./get_hiphy_status.sh && ./get_duipc_status.sh && ./get_du_status.sh
+
+root@qa01:[~/kent/ran_control/maple/compal_script]: ls
+check_process.sh  get_duipc_status.sh  get_hiphy_status.sh  ptplog        ran_stop.sh  shutdown_hiphy.sh    stop_controller.sh  weblog
+get_cu_status.sh  get_du_status.sh     measure_time.sh      ran_start.sh  rc.local     start_controller.sh  test.sh
+
+● 檢查有無process
+ssh 10.205.102.211
+ps aux | grep gnb_cu
+ps aux | grep gnb_du
+ps aux | grep ipc_fwd
+ssh 10.205.102.214
+ps aux | grep bs_bbu_main
+ps aux | grep ipc_fwd
+
+● 砍掉process
+ssh 10.205.102.211
+pkill -9 gnb_cu
+pkill -9 gnb_du
+pkill -9 ipc_fwd
+ssh 10.205.102.214
+pkill -9 bs_bbu_main
+pkill -9 ipc_fwd
+
+// 【step6】: 停站
+cd /root/kent/ran_control/maple/itri
+./ran_stop.sh 
+
+=======================================================================
+
+1. 安裝VMware_Workstation_Pro_17.6.1_setup_azo.exe
+設定40g
+C:\Users\Dustin_Chen\Documents\Virtual Machines\CentOS 7 64-bit
+
+2. VMware_Workstation=>virtual machine
+ctrl+alt切換滑鼠
+
+// 查看VM的ip, 第一次看不到IP
+ip address
+
+// 修改底下這支file
+vi /etc/sysconfig/network-scripts/ifcfg-ens33
+
+// 把ONBOOT修改
+ONBOOT=no修改成ONBOOT=yes
+按ESC, wq!
+
+// 啟動這個
+ifup ifcfg-ens33
+
+// 再檢查一次, 看到長出來ens33的ip: ex: 192.168.192.128
+ip a
+
+[root@localhost ~]# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 00:0c:29:3c:d9:81 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.192.128/24 brd 192.168.192.255 scope global noprefixroute dynamic ens33
+       valid_lft 1740sec preferred_lft 1740sec
+    inet6 fe80::d820:c3cf:5234:b599/64 scope link noprefixroute
+       valid_lft forever preferred_lft forever
+
+// mobaxTerm ssh進入root/maple
+192.168.192.128
+把CentOS-7-x86_64-Minimal-2009.iso和greencube-installer.sh放在root底下
+
+// 開執行權限
+chmod 755 greencube-installer.sh
+
+// 因為greencube-installer.sh要新增資料夾
+mkdir /home/maple
+
+// 安裝greencube
+./greencube-installer.sh
+
+// 編輯
+/etc/systemd/system/tomcat.service
+把8192改成1024
+#Environment="CATALINA_OPTS=-Xms8192M -Xmx8192M -server -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+Environment="CATALINA_OPTS=-Xms1024M -Xmx1024M -server -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+
+// 重新啟動系統
+systemctl start tomcat.service
+
+// 會叫妳先打底下
+[root@localhost system]# systemctl start tomcat.service
+Warning: tomcat.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+
+// 執行底下，
+systemctl daemon-reload
+
+// 再輸入一次
+systemctl start tomcat.service
+
+// ifconfig查詢ens33的ip，更換底下<ip>
+http://<ip>:8080/CMSLite/swagger-ui/
+http://192.168.192.128:8080/CMSLite/swagger-ui/
+
+// google搜尋cron job
+// https://stackoverflow.max-everyday.com/2017/08/centos-crontab/
+
+// ●編輯底下
+vi /etc/crontab
+
+// 註解掉用#, 注意最後一行要多打enter
+// The output from vi is normal, crontab will copy it to the correct location
+// =>Check that there is a newline at the end of your command (crontab -e and press return at the end of the line)
+#*/3 * * * * root bash /home/maple/greencube/checkODL.sh >/dev/null 2>&1
+*/1 * * * * root bash /root/kent/ran_control/maple/itri/check_process.sh
+
+// ●查看log
+vi /var/log/cron
+
+// 每秒查看
+watch -n 1 "tail -n 1 /var/log/cron"
+
+// 查看crond有沒有active
+[root@localhost etc]# systemctl status crond
+● crond.service - Command Scheduler
+   Loaded: loaded (/usr/lib/systemd/system/crond.service; enabled; vendor preset: enabled)
+   Active: active (running) since Thu 2024-12-19 10:27:32 UTC; 1h 59min left
+ Main PID: 686 (crond)
+   CGroup: /system.slice/crond.service
+           └─686 /usr/sbin/crond -n
+
+http://192.168.204.128:8080/CMSLite/swagger-ui/
+
+// 直接在maple server執行底下script
+bash /home/maple/check_process.sh
+
+=========================================
+// 把check_process.sh檔案傳上去anydesk傳上去
+●ubuntu
+cd /home/mys-nodejs/Documents/CSCsim
+scp check_process.sh root@10.205.102.211:/root/kent/ran_control/maple/itri
+
+===============================
+台北環境整理好了, 目前起站看起來沒問題
+Anydesk: 119899531/compal123
+
+[核網筆電(跳板機)]  bin_Saviah5gc-v3.3.4
+- AMF N2:10.205.101.82; 
+- UPF N3:10.205.101.176; 
+- Host IP:10.205.102.1
+
+[Maple Server] CU->cu_CSC_cisco_og.xml / DU->du_n78_cypress_og.xml
+- N2:10.205.102.212; 
+- N3:10.205.102.213; 
+- Host IP: 10.205.102.211
+
+[GV] script->preconfig_CSC_1cc_Cypress.sh
+- Host IP:10.205.102.214
+
+[Cypress(n78)] 
+- webIP:10.205.102.215(admin/adMin12345)
+===============================
+差別在參數  
+true -> 起站, 
+false 關站
+
+//false 關站
+curl -vv -X POST "http://localhost:8080/CMSLite/api/ran/v1_0/setORANService" -H "asdfghjk: 0c9ddf46e39193a10f47101365493907" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"turnOn\": false}"
+
+//true -> 起站,
+curl -vv -X POST "http://localhost:8080/CMSLite/api/ran/v1_0/setORANService" -H "asdfghjk: 0c9ddf46e39193a10f47101365493907" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"turnOn\": true}"
+=======================================
+    echo "Sending request to turn off the service..."
+    mesg="$(curl -vv -X POST "http://localhost:8080/CMSLite/api/ran/v1_0/setORANService" \
+        -H "asdfghjk: 0c9ddf46e39193a10f47101365493907" \
+        -H "accept: application/json" \
+        -H "Content-Type: application/json" \
+        -d "{ \"turnOn\": false}")"
+    echo "result  '$mesg'"
+===========
+= kent●●
+===========
+maple	10.205.102.211 
+gv 		10.205.102.214 
+
+我把東西精簡成這兩個壓縮檔，
+maple.tgz copy到maple server解壓縮後進入maple資料夾執行install.sh即可; 
+hiphy.tgz copy到GV卡解壓縮後進入hiphy資料夾執行install.sh即可; 
+兩邊都install完以後 
+/opt/itri/目錄下有多個script可以做起站關站或
+觀察各個item的status ，
+status = 
+0 為停止狀態，
+1 為啟動中，
+2 為啟動完畢
+3 啟動時出現error
+
+// 順序Maple server 
+1. CU start
+2. Notify hiphy start: IPC start -> main start
+3. DUIPC start
+4. DU start -> L2[1] is UP
+=======================================================================
+/////// 檢查 cron (現在不用crontab，直接寫在check_process.sh，並且在 /etc/rc.local 開機自動啟動)
+// ●編輯底下
+vi /etc/crontab
+// 增加這行
+*/1 * * * * root bash /root/kent/ran_control/maple/itri/check_process.sh
+
+// ●查看log
+vi /var/log/cron
+// 每秒查看
+watch -n 1 "tail -n 1 /var/log/cron"
+
+// 查看 maple log
+root@qa01:[~/kent/ran_control/maple/itri]: cd /home/maple/start-log/
+
+// 查看 highPHY log
+root@BNWB23402310:~# cd /root/gvlog/
+
+// 開機起站腳●
+root@qa01:[~/kent/ran_control/maple/itri]: vi /etc/rc.local
+touch /var/lock/subsys/local
+ulimit -Hn 102400
+ulimit -Sn 102400
+source /etc/profile.d/jdk17.sh
+cd /home/maple/
+/home/maple/ptp &
+sleep 10
+/home/maple/controller &
+
+// 測試砍掉process能不能自動恢復
+pkill -9 gnb_cu
+pkill -9 gnb_du
+pkill -9 ipc_fwd
+pkill -9 bs_bbu_main
+======================
+./ran_stop
+sleep 30
+等30sec
+
+===========
+= maple起站
+===========
+//PHY 
+/root
+./start_gnb.sh 9
+./start_gnb.sh 4
+./start_gnb.sh 3
+
+//CU
+/home/maple/cu_bin_v0.1.0.b4/
+./start_gnb.sh 3
+cu start
+
+// DU左
+/home/maple/du_bin_v0.1.0.b6/bin
+du ipcfwd start
+
+// DU右
+/home/maple/du_bin_v0.1.0.b6/bin
+du start
+
+=========================
+// 下了ran_stop
+root@qa01:[~/kent/ran_control/maple/itri]: ./ran_stop.sh 
+* About to connect() to localhost port 8080 (#0)
+*   Trying ::1...
+* Connected to localhost (::1) port 8080 (#0)
+> POST /CMSLite/api/ran/v1_0/setORANService HTTP/1.1
+> User-Agent: curl/7.29.0
+> Host: localhost:8080
+> asdfghjk: 0c9ddf46e39193a10f47101365493907
+> accept: application/json
+> Content-Type: application/json
+> Content-Length: 18
+> 
+* upload completely sent off: 18 out of 18 bytes
+< HTTP/1.1 200 
+< Vary: Origin
+< Vary: Access-Control-Request-Method
+< Vary: Access-Control-Request-Headers
+< Content-Type: application/json
+< Content-Length: 23
+< Date: Fri, 20 Dec 2024 09:13:37 GMT
+< 
+{"result":"Stop ran."}
+* Connection #0 to host localhost left intact
+
+===========================================================
+cd /root/kent/ran_control/maple/itri
+root@qa01:[~/kent/ran_control/maple/itri]: ./ran_start.sh 
+===========================================================
+root@qa01:[~/kent/ran_control/maple/itri]: ./get_cu_status.sh
+{"result":"0"}
+root@qa01:[~/kent/ran_control/maple/itri]: ./get_hiphy_status.sh
+{"result":"0"}
+root@qa01:[~/kent/ran_control/maple/itri]: ./get_duipc_status.sh
+{"result":"0"}
+root@qa01:[~/kent/ran_control/maple/itri]: ./get_du_status.sh
+{"result":"0"}
+===========================================================
+root@qa01:[~/kent/ran_control/maple/itri]: ./ran_stop.sh
+=========================================================== 
+// 找出defunct去把它kill
+ps aux | grep controller
+
+// 重新執行controller
+cd /home/maple
+/home/maple/controller &
+要
+./ran_start.sh 
+
+cat /etc/rc.local 
+vi /etc/rc.local 
+
+================================================
+= 【上傳】檔案從local NB->anydesk PC->maple server
+================================================
+//anydesk上傳到\home\mys-nodejs\Documents\CSCsim
+scp /home/mys-nodejs/Documents/CSCsim/check_process.sh   root@10.205.102.211:/root/kent/ran_control/maple/compal_script
+scp /home/mys-nodejs/Documents/CSCsim/check_process.sh   root@10.205.102.211:/opt/compal_script
+
+mys-nodejs@mysnodejs:~/Documents/CSCsim$ 
+cd /home/mys-nodejs/Documents/CSCsim
+
+mys-nodejs@mysnodejs:~/Documents/CSCsim$ 
+scp measure_time.sh root@10.205.102.211:/root/kent/ran_control/maple/itri
+scp check_process.sh root@10.205.102.211:/root/kent/ran_control/maple/itri
+
+================================================
+= 【下載】檔案從maple server->anydesk PC->local NB
+================================================
+//先切不是etc路徑
+mys-nodejs@mysnodejs:/etc$ cd ~/
+
+//maple server->anydesk PC
+mys-nodejs@mysnodejs:/etc$ scp root@10.205.102.211:/root/kent/ran_control/maple/itri.gz ./
+
+// 把compal_script從server抓下來
+scp -r root@10.205.102.211:/root/kent/ran_control/maple/compal_script ./
+scp -r root@10.205.102.211:/opt/compal_script.gz ./
+
+//用anydesk傳檔案
+\home\mys-nodejs
+
+====================================================
+// 下了ran_start.sh
+root@qa01:[~/kent/ran_control/maple/itri]: ./ran_start.sh 
+* About to connect() to localhost port 8080 (#0)
+*   Trying ::1...
+* Connected to localhost (::1) port 8080 (#0)
+> POST /CMSLite/api/ran/v1_0/setORANService HTTP/1.1
+> User-Agent: curl/7.29.0
+> Host: localhost:8080
+> asdfghjk: 0c9ddf46e39193a10f47101365493907
+> accept: application/json
+> Content-Type: application/json
+> Content-Length: 17
+> 
+* upload completely sent off: 17 out of 17 bytes
+< HTTP/1.1 200 
+< Vary: Origin
+< Vary: Access-Control-Request-Method
+< Vary: Access-Control-Request-Headers
+< Content-Type: application/json
+< Content-Length: 32
+< Date: Fri, 20 Dec 2024 09:25:13 GMT
+< 
+{"result":"Maple is starting."}
+* Connection #0 to host localhost left intact
+=======================================
+cat /etc/rc.local 
+vi /etc/rc.local 
+
+cd /home/maple/
+vi controller.ini 
+/home/maple/controller &
+
+root@qa01:[/home/maple]: ps aux | grep controller
+root     23860  0.9  0.0  10864   920 pts/10   S    03:30   0:00 /home/maple/controller
+root     23861  1.5  0.0 228400 38752 pts/10   S    03:30   0:00 /home/maple/controller
+root     24199  0.0  0.0 112816   988 pts/10   S+   03:30   0:00 grep --color=auto controller
+root@qa01:[/home/maple]: kill -9 23860 23861 24199
+-bash: kill: (24199) - No such process
+[1]+  Killed                  /home/maple/controller
+
+cd /root/kent/ran_control/maple/itri
+root@qa01:[~/kent/ran_control/maple/itri]: ls
+check_process.sh  get_duipc_status.sh  get_hiphy_status.sh  ran_start.sh  shutdown_hiphy.sh  weblog
+get_cu_status.sh  get_du_status.sh     ptplog               ran_stop.sh   test.sh
+=========================================
+root@qa01:[~/kent/ran_control/maple/itri]: ./measure_time.sh 
+* About to connect() to localhost port 8080 (#0)
+*   Trying ::1...
+* Connected to localhost (::1) port 8080 (#0)
+> POST /CMSLite/api/ran/v1_0/setORANService HTTP/1.1
+> User-Agent: curl/7.29.0
+> Host: localhost:8080
+> asdfghjk: 0c9ddf46e39193a10f47101365493907
+> accept: application/json
+> Content-Type: application/json
+> Content-Length: 17
+> 
+* upload completely sent off: 17 out of 17 bytes
+< HTTP/1.1 200 
+< Vary: Origin
+< Vary: Access-Control-Request-Method
+< Vary: Access-Control-Request-Headers
+< Content-Type: application/json
+< Content-Length: 32
+< Date: Mon, 23 Dec 2024 07:38:34 GMT
+< 
+{"result":"Maple is starting."}
+* Connection #0 to host localhost left intact
+Time to reach 'result:2' for ./get_cu_status.sh: 37629ms
+Time to reach 'result:2' for ./get_hiphy_status.sh: 49785ms
+Time to reach 'result:2' for ./get_duipc_status.sh: 64453ms
+Time to reach 'result:2' for ./get_du_status.sh: 14460ms
+總時間為：
+166,327 ms（166.3 秒）。
+====================
+ps afx
+cat /home/maple/conuti/custart
+// 查看cu
+tail -f /home/maple/log_tmp/cu_bin_console.txt
+./ran_stop.sh
+./ran_start.sh
+=========================
+/root/kent/ran_control/maple/itri
+root@qa01:[~/kent/ran_control/maple/itri]: ls
+check_process.sh  get_duipc_status.sh  get_hiphy_status.sh  ptplog        ran_stop.sh  shutdown_hiphy.sh  weblog
+get_cu_status.sh  get_du_status.sh     measure_time.sh      ran_start.sh  rc.local     test.sh
+
+/root/kent/ran_control/maple/itri/check_process.sh
+==============================
+
+root@BNWB23402309:~# ps -a
+  PID TTY          TIME CMD
+ 8267 pts/5    41-05:42:44 bs_bbu_main
+ 8342 pts/3    5-04:19:58 ipc_fwd
+
+root@BNWB23402309:~# ps aux | grep bs_bbu_main
+root      8267  794  5.3 137303980 1609600 pts/5 RLl+ Sep06 59387:48 ./bs_bbu_main -c 0x1FE0 -- --verbose -C 0x1FE0 --DLAdvTime 200 --BBU_MAC DA:DA:DA:DA:DA:DA --RRU_MAC c8:4d:34:f0:00:03
+root@BNWB23402309:~# ps aux | grep ipc_fwd
+root      8342 99.8  0.1 134523248 32684 pts/3 RLl+ Sep06 7460:47 ./ipc_fwd -c 0x0C --proc-type=auto --file-prefix=ipc_fwd -- --loopback_mode 0 --test_data_size 64 --test_burst_size 1 --num_cells=1 --debug_flag 0
+=================================
+root@qa01:[~/kent/ran_control/maple/itri]: ps -a
+  PID TTY          TIME CMD
+ 3767 tty1     00:00:00 ssh
+16503 pts/1    00:00:00 controller
+16504 pts/1    00:00:01 sh
+18886 pts/1    00:00:00 controller
+18887 pts/1    00:00:02 controller
+21494 pts/1    00:10:27 gnb_cu
+21495 pts/1    00:00:00 tee
+21984 pts/1    00:00:00 controller
+21985 pts/1    00:00:00 sh
+24067 pts/1    00:07:53 ipc_fwd
+24574 pts/1    00:00:00 controller
+24575 pts/1    00:00:00 sh <defunct>
+29003 pts/1    00:00:00 sh
+31019 pts/1    00:00:00 tcpdump
+31038 pts/1    00:00:26 gnb_du
+31039 pts/1    00:00:00 tee
+31612 pts/0    00:00:00 ps
+
+=========================
+pkill -9 gnb_cu
+pkill -9 gnb_du
+pkill -9 ipc_fwd
+
+ps aux | grep gnb_cu
+ps aux | grep gnb_du
+ps aux | grep ipc_fwd
+

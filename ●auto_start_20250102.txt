@@ -31,7 +31,8 @@ cd /home/maple
 // 【step3】: 到kent路徑下去執行script
 cd /root/kent/ran_control/maple/compal_script
 
-// 【step4】: 先起站
+// 【step4】: ●●●reboot Maple後，先起站●●●●
+cd /opt/compal_script
 ./ran_start.sh 
 
 // 【step5】: 檢查4個腳本
@@ -71,6 +72,78 @@ pkill -9 ipc_fwd
 // 【step6】: 停站
 cd /root/kent/ran_control/maple/itri
 ./ran_stop.sh 
+
+// 【step7】檢查log
+/home/maple/start-log/
+
+
+輸出範例
+如果 get_cu_status.sh 回傳 {"result":"3"}，會在 /home/maple/start-log/ 下生成類似以下的檔案：
+
+bash
+複製程式碼
+/home/maple/start-log/restart_20250107_120000.log
+檔案內容：
+
+csharp
+複製程式碼
+Triggered by get_cu_status.sh at Mon Jan 7 12:00:00 2025
+==================
+= ●●●●安裝步驟
+==================
+1.	Dustin改2r變4r
+	2r	4r
+(1)PHY改preconfig	cd script/preconfig_CSC_1cc_Cypress.sh	cd script/preconfig_CSC_1cc_Cypress_4r.sh
+(2)RU改antenna	
+UL Antennas: 2  DL Antennas: 4	
+UL Antennas: 4  DL Antennas: 4
+(3)DU改bin	PATH="/home/maple/du_bin_v0.1.0.b7/"	PATH="/home/maple/du_bin_v0.1.0.b7_Bryan_TA_4r"
+(4)DU改xml	
+//2r
+<dlRank>4</dlRank>
+<ulRank>2</ulRank>
+<dlNumAntPorts>4</dlNumAntPorts>
+<ulNumOfAntPorts>2</ulNumOfAntPorts>
+//4r
+<dlRank>4</dlRank>
+<ulRank>2</ulRank>
+<dlNumAntPorts>4</dlNumAntPorts>
+<ulNumOfAntPorts>4</ulNumOfAntPorts>
+
+2.	Dustin把David檔案greencube-installer.sh & greencube-nopython-20241212.tar.gz放到maple安裝
+=>FirewallD is not working代表防火牆沒有開 不影響 原本如果防火牆有開 需要打開部分連接埠 不然會被阻擋
+
+3.	Dustin把Kent檔案maple.tgz解壓縮到maple執行install.sh，hiphy.tgz解壓縮到gv卡執行install.sh
+=>執行maple的install.sh，會安裝maple\compal_script和maple\conuti，裡面conuti資料夾會load ranman 的東西source /opt/ranman/ranenv 
+=>執行hiphy的install.sh
+
+4.	把maple server reboot，這樣/etc/rc.local才會執行Dustin腳本，每1分鐘check status
+/opt/compal_script/check_process.sh &
+5.	Dustin執行第一次起站script: /opt/compal_script/ran_start.sh，檢查4個status是否正常為2
+./get_cu_status.sh && ./get_hiphy_status.sh && ./get_duipc_status.sh && ./get_du_status.sh
+6.	Dustin模擬砍掉process，是否status變成3，執行Dustin的check_process.sh，自動恢復成2
+// 砍掉任意底下5個process
+ssh 10.205.102.211
+pkill -9 gnb_cu
+pkill -9 gnb_du
+pkill -9 ipc_fwd
+
+ssh 10.205.102.214
+pkill -9 bs_bbu_main
+pkill -9 ipc_fwd	// 檢查有無process
+ssh 10.205.102.211
+ps aux | grep gnb_cu
+ps aux | grep gnb_du
+ps aux | grep ipc_fwd
+
+ssh 10.205.102.214
+ps aux | grep bs_bbu_main
+ps aux | grep ipc_fwd	// 檢查四個status
+./get_cu_status.sh && ./get_hiphy_status.sh && ./get_duipc_status.sh && ./get_du_status.sh	status = 
+0->為停止狀態，
+1->為啟動中，
+2->為啟動完畢
+3 -> 啟動時出現error
 
 =======================================================================
 
@@ -380,9 +453,14 @@ scp check_process.sh root@10.205.102.211:/root/kent/ran_control/maple/itri
 mys-nodejs@mysnodejs:/etc$ cd ~/
 
 //maple server->anydesk PC
-mys-nodejs@mysnodejs:/etc$ scp root@10.205.102.211:/root/kent/ran_control/maple/itri.gz ./
+scp root@10.205.102.211:/root/kent/ran_control/hiphy.tgz ./
+scp root@10.205.102.211:/root/kent/ran_control/maple.tgz ./
+
 
 // 把compal_script從server抓下來
+cd /root/kent/ran_control
+scp -r root@10.205.102.211:/root/kent/ran_control/maple/compal_script ./
+
 scp -r root@10.205.102.211:/root/kent/ran_control/maple/compal_script ./
 scp -r root@10.205.102.211:/opt/compal_script.gz ./
 
@@ -519,3 +597,23 @@ ps aux | grep gnb_cu
 ps aux | grep gnb_du
 ps aux | grep ipc_fwd
 
+===============================
+Eric架設環境測試流程:
+1. 開機後第一次先手動執行/opt/compal_script/
+./ran_start.sh 
+
+2. 可以檢查4個status都是2就是起站成功
+//一次檢查四個
+./get_cu_status.sh && ./get_hiphy_status.sh && ./get_duipc_status.sh && ./get_du_status.sh
+
+3. 嘗試把cu, du, ipc_fwd任意一個砍掉
+pkill -9 gnb_cu
+pkill -9 gnb_du
+pkill -9 ipc_fwd
+
+4. 因為有把我寫的check_process.sh寫在開機自動腳本
+vi /etc/rc.local
+新增
+/opt/compal_script/check_process.sh &
+我的腳本每1分鐘會在遇到status=3有問題的時候，自動偵測執行關站&起站，
+目前測是成功把上面3個任意cu, du, ipc_fwd砍掉，都可以回到status=2

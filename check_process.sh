@@ -10,6 +10,10 @@ STATUS_SCRIPTS=("get_cu_status.sh" "get_hiphy_status.sh" "get_duipc_status.sh" "
 TARGET_RESULT='{"result":"2"}'
 CHECK_RESULT='{"result":"3"}'
 
+# 定義記錄檔路徑
+LOG_DIR="/home/maple/start-log"
+mkdir -p "$LOG_DIR"
+
 # 切換到目標路徑
 cd "$TARGET_DIR" || {
   echo "Failed to change directory to $TARGET_DIR"
@@ -22,6 +26,10 @@ while :; do
     result=$(./$script 2>/dev/null)
     if [[ $result == "$CHECK_RESULT" ]]; then
       echo "Detected result '3' from $script. Executing stop and restart commands."
+
+      # 記錄觸發的腳本和時間到記錄檔
+      log_file="$LOG_DIR/restart_$(date '+%Y%m%d_%H%M%S').log"
+      echo "Triggered by $script at $(date)" > "$log_file"
 
       # 停止 ran
       ./ran_stop.sh
